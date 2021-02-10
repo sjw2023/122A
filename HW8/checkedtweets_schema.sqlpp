@@ -1,0 +1,111 @@
+DROP DATAVERSE checkedtweets_schema IF EXISTS;
+CREATE DATAVERSE checkedtweets_schema;
+USE checkedtweets_schema;
+
+// Create the data types for our datasets.
+CREATE TYPE RawTweetType AS {
+  // Note: the actual RawTweet is much richer than this, do a "SELECT * FROM RawTweet LIMIT 1" to take a peek!
+
+  coordinates : {
+    // posting_location (two doubles for longitude, latitude)
+    coordinates : [ double ]
+  } ?,
+
+  // posting_datetime
+  created_at: string,
+
+  extended_tweet: {
+    entities : {
+      hashtags : [ { text: string } ] ?
+    }
+  },
+
+  // tweet_id
+  id: string,
+  // replied_to_tweet
+  in_reply_to_status_id_str: string ?,
+  // quoted_tweet
+  quoted_status_id_str: string ?,
+  // tweet_text
+  text: string,
+
+  user: {
+    // followers_count
+    followers_count: bigint,
+    // tweeter_id
+    id_str: string,
+    // display_name
+    name: string,
+    // handle
+    screen_name: string,
+    // verified
+    verified: boolean
+  }
+};
+CREATE TYPE UserType AS {
+    // A user can either be a "USER" or a "CHECKER".
+    kind : string,
+
+    // All User related fields here.
+    user_id : int,
+    name : { first : string, last : string },
+    email : string,
+    password : string,
+    user_since : datetime,
+    profile_pic : string ?,
+    address: { country : string, state: string ?, city : string },
+
+    // All Checker related fields here.
+    checker_since : datetime ?,
+    expertise : [ string ] ?,
+    phone : [ { kind : string, number : string } ] ?
+};
+CREATE TYPE EvidenceType AS {
+    ev_id : int,
+    url : string,
+
+    // Holds all tweet_ids that this evidence is about.
+    about : [ string ]
+};
+CREATE TYPE EvidenceFromType AS {
+    user_id : int,
+    ev_id : int
+};
+CREATE TYPE VerificationType AS {
+    ver_id : int,
+    tweet_id : string,
+    verified_by : int,
+    comment : string ?,
+    verified_on : datetime,
+
+    // Holds all ev_ids that this verification uses.
+    evidence : [ int ]
+};
+
+// Create our datasets.
+CREATE DATASET RawTweet(RawTweetType) PRIMARY KEY id;
+CREATE DATASET User(UserType) PRIMARY KEY user_id;
+CREATE DATASET Evidence(EvidenceType) PRIMARY KEY ev_id;
+CREATE DATASET EvidenceFrom(EvidenceFromType) PRIMARY KEY user_id, ev_id;
+CREATE DATASET Verification(VerificationType) PRIMARY KEY ver_id;
+
+// Load our datasets. (Note: Replace **ALL** instances of "PATH_TO_HW8_FOLDER_GOES_HERE" !)
+LOAD DATASET RawTweet USING localfs
+    (("path"=":///Users/joowonsuh/hw8/data/rawtweet.json"),("format"="json"));
+LOAD DATASET User USING localfs
+    (("path"=":///Users/joowonsuh/hw8/data/user.json"),("format"="json"));
+LOAD DATASET EvidenceFrom USING localfs
+    (("path"=":///Users/joowonsuh/hw8/data/evidencefrom.json"),("format"="json"));
+LOAD DATASET Evidence USING localfs
+    (("path"=":///Users/joowonsuh/hw8/data/evidence.json"),("format"="json"));
+LOAD DATASET Verification USING localfs
+    (("path"=":///Users/joowonsuh/hw8/data/verification.json"),("format"="json"));
+
+// Verify that our datasets have been loaded correctly.
+SELECT VALUE {
+    "tweetCount": (SELECT VALUE COUNT(*) FROM RawTweet)[0],
+    "userCount": (SELECT VALUE COUNT(*) FROM User)[0],
+    "evidenceFromCount": (SELECT VALUE COUNT(*) FROM EvidenceFrom)[0],
+    "evidenceCount": (SELECT VALUE COUNT(*) FROM Evidence)[0],
+    "verificationCount": (SELECT VALUE COUNT(*) FROM Verification)[0]
+};
